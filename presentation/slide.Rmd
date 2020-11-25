@@ -1,0 +1,43 @@
+---
+title: "Airbnb project presentation"
+author: Lambert Alexandre
+date: November 26, 2020
+output: ioslides_presentation
+---
+
+# How it's work
+
+## Getting Data
+
+- Parse csv url into data frame
+  - urls listing and calendar
+  - country
+  - city
+  - date
+- Methods
+  -  mutate with str_replace
+  - separate
+  - select and arrange
+
+## Getting Data
+
+- Download all csv fill with this architecure
+  - data
+    - data_raw
+      - country_1
+        - city_2
+          - date_1
+            - listings.csv
+            - calendar.csv
+          - date_2
+      - country_2
+      - ...
+
+
+## Cleanning Data And Utils Function
+
+- Select interesting columns & check if file contains all header
+- Cleanning like data_preparation_script.R (mutate, summarise, ...)
+- function to get listings with conditions
+- function to clean deeper the dataset
+- get country/cities name

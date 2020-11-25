@@ -1,0 +1,259 @@
+---
+title: "Airbnb Project Analysis"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    social: menu
+    source_code: embed
+runtime: shiny
+---
+
+```{r global, include=FALSE}
+# load data in 'global' chunk so it can be shared by all users of the dashboard
+library(datasets)
+library(shiny)
+library(ggplot2)
+library(reshape2)
+library(leaflet)
+library(htmltools)
+#library(leafgl)
+```
+
+```{r }
+source("script/configuration.R")
+source("script/data_preparation.R")
+source("script/analize_data.R")
+source("script/log_utils.R")
+```
+
+
+Analysis 1
+=====================================
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+city_list_input_reactive <- reactive({
+  get_cities_by_country(input$country)
+
+})
+
+checkboxInput('jitter', 'Show value (Jitter)', value = FALSE)
+checkboxInput('smooth', 'Smooth', value = TRUE)
+
+selectInput("country", "Choose the country's:",
+               country_list_input, selected="all country", multiple=TRUE)
+
+renderUI({
+
+  selectInput("city", "Choose the city's:",
+                 city_list_input_reactive(), selected="all city", multiple=TRUE)
+})
+selectInput("date", "Number of last data date use:",
+               c("1","2","3"), selected="1", multiple=FALSE)
+renderUI({
+    max <-as.Date(get_max_date(get_listings(as.numeric(input$date))))
+    min <-as.Date(get_min_date(get_listings(as.numeric(input$date))))
+    sliderInput("date_range", "Range date:",min =min, max = max, value = c(min,max), timeFormat="%Y-%m-%d")
+})
+
+selectInput('y', 'Analyse by :', distribution_variable_y_list)
+selectInput('filter1', 'And By', filter_variable)
+selectInput('filter2', 'And By', filter_variable)
+
+
+```
+```{r}
+title_panel_1 <- reactive({
+  title <- paste0("Distribution of ",input$city, " by ", input$y)
+  if(input$filter1 != 'None') {
+    title <- paste0(title, " and by ", input$filter1)
+  }
+  if(input$filter2 != 'None'){
+    title <- paste0(title, " and by ", input$filter2)
+  }
+  title
+
+})
+
+
+
+
+```
+
+
+Outputs {.tabset}
+-----------------------------------------------------------------------
+
+### `r title_panel_1`
+
+```{r}
+dataset <- reactive({
+
+  if (input$city == "all city"){
+    filter(get_listings(as.numeric(input$date)),between(data_date,input$date_range[1],input$date_range[2]))
+  } else{
+    filter(get_listings(as.numeric(input$date)),city == input$city,between(data_date,input$date_range[1],input$date_range[2]))
+  }
+})
+
+renderPlot({
+
+  p <- ggplot(dataset(), aes_string(x="city", y=input$y)) + geom_boxplot(outlier.shape = NA) +
+  scale_y_continuous(limits = quantile(dataset()[input$y], c(0.1, 0.9), na.rm = T))
+
+  if (input$filter1 != 'None')
+    p <- ggplot(dataset(), aes_string(x="city", y=input$y, fill=input$filter1)) + geom_boxplot( outlier.shape = NA) + scale_y_continuous(limits = quantile(dataset()[input$y], c(0.1, 0.9), na.rm = T))
+
+
+  if (input$filter2 != 'None')
+    p <- p + facet_grid(input$filter2)
+
+
+  if (input$jitter)
+    p <- p + geom_jitter()
+  if (input$smooth)
+    p <- p + geom_smooth()
+
+  print(p)
+})
+
+
+```
+
+Analysis 2
+=====================================
+Inputs {.sidebar}
+-----------------------------------------------------------------------
+
+```{r}
+
+city_list_input_reactive_2 <- reactive({
+  get_cities_by_country_2(input$country_2)
+
+})
+
+checkboxInput('jitter_2', 'Show value (Jitter)', value = FALSE)
+checkboxInput('smooth_2', 'Smooth', value = TRUE)
+
+selectInput("country_2", "Choose the country's:",
+               country_list_input, multiple=FALSE)
+renderUI({
+  selectInput("city_2", "Choose the city's:",
+                city_list_input_reactive_2(), multiple=FALSE)
+})
+selectInput("date_2", "Number of last data date use:",
+               c("1","2","3"), selected="1", multiple=FALSE)
+
+selectInput('y_2', 'Analyse by :', distribution_variable_y_list)
+selectInput('filter1_2', 'And By', filter_variable_2,selected="room_type")
+selectInput('filter2_2', 'And By', filter_variable_2, selected="bedrooms")
+selectInput('filter3_2', 'And By', filter_variable_2,selected="neighbourhood_cleansed")
+renderUI({
+  max <-get_max_percet_of__neighbourhood_cleansed(input$city_2,input$date_2)
+  sliderInput("neighbourhood_percent", "Percent of listing by neighbourhood by city:",min = 0, max = max, value = c(max-0.1,max))
+})
+
+
+
+
+```
+```{r}
+title_panel_1 <- reactive({
+  title <- paste0("Distribution of ",input$city_2, " by ", input$y_2)
+  title <- paste0(title, " and by ", input$filter1_2)
+  title <- paste0(title, " and by ", input$filter2_2)
+  title <- paste0(title, " and by ", input$filter3_2)
+
+  title
+
+})
+```
+
+
+Outputs {.tabset}
+-----------------------------------------------------------------------
+
+### `r title_panel_1`
+
+```{r}
+dataset_2 <- reactive({
+get_dataset_neighbourhood_cleansed(input$neighbourhood_percent, input$city_2, input$date_2)
+})
+
+
+renderPlot({
+
+
+
+    p <- ggplot(dataset_2(), aes_string(x=input$filter1_2, y=input$y_2)) + geom_boxplot( outlier.shape = NA,aes_string(fill=input$filter2_2)) +
+    stat_summary(fun.y=mean, geom="point", aes_string(group=input$filter2_2), position=position_dodge(.8),color="black", size=4) +
+    scale_y_continuous(limits = quantile(dataset_2()[input$y_2], c(0.1, 0.9), na.rm = T))
+
+    p <- p +
+    facet_grid(input$filter3_2)
+
+
+
+
+  if (input$jitter_2)
+    p <- p + geom_jitter()
+  if (input$smooth_2)
+    p <- p + geom_smooth()
+
+
+  print(p)
+})
+```
+```{r}
+title_panel_2 <- reactive({
+  title <- paste0("Average of ",input$y_2," over next 30 days for each room_type/ house size/ neighborhood")
+  title
+
+})
+```
+
+### Map
+
+
+```{r}
+dataset_3 <- reactive({
+  get_dataset_neighbourhood_cleansed_map(input$neighbourhood_percent, input$city_2, input$date_2)
+})
+
+renderLeaflet({
+  content <- paste(sep = "<br/>",
+    paste("<b>",dataset_3()$city," ",dataset_3()$property_type, " ",dataset_3()$room_type,"</b>"),
+    paste(" Neighbourhood :", dataset_3()$neighbourhood_cleansed),
+    paste(" Price : $", dataset_3()$price),
+    paste(" Availability over 30 days :", dataset_3()$availability_30),
+    paste(" Revenue over 30 days : $", dataset_3()$revenue_30)
+  )
+  pal <- colorQuantile(
+  palette = 'Paired',
+  domain = dataset_3()$price,
+  n=10
+)
+  leaflet(data=dataset_3(), options = leafletOptions(preferCanvas = TRUE)) %>% addTiles() %>% addCircleMarkers(
+    popup=content,
+    radius =  6,
+    stroke = FALSE, fillOpacity = 0.5, color =~pal(price)
+  ) %>% addLegend("bottomright", pal = pal, values = dataset_3()$price,
+    title = "Price range in percent ",
+    opacity = 1
+  )
+
+})
+
+
+
+```
+
+Datastet Overview
+=====================================
+### Dataset
+```{r}
+renderTable({
+  head(get_listings(1), 50)
+})
+```
